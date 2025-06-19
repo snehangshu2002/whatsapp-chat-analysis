@@ -6,3 +6,6 @@ seaborn
 wordcloud
 emoji
 regex
+urlextract
+nltk
+re
