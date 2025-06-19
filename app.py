@@ -1,39 +1,83 @@
 import streamlit as st
 import pandas as pd
-import Preprocessor, helper
 import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 import seaborn as sns
 from matplotlib import rcParams
 import plotly.express as px
+import json
+import helper
+import Preprocessor
+import re
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from urlextract import URLExtract
+from collections import Counter
+import nltk
+from nltk.tokenize import word_tokenize
 
+# Download required NLTK data
+nltk.download('punkt', quiet=True)
 
-
-# Set emoji-compatible font
 rcParams['font.family'] = 'Segoe UI Emoji'
+analyzer = SentimentIntensityAnalyzer()
 
-# Sidebar UI
-st.sidebar.title("WhatsApp Chat Analyzer")
-uploaded_file = st.sidebar.file_uploader("Choose a file", type=["txt"])
+def get_sentiment(text):
+    if not isinstance(text, str) or not text.strip():
+        return 0.0
+    return analyzer.polarity_scores(text)['compound']
+
+def sentiment_label(score):
+    if score > 0.05:
+        return "Positive"
+    elif score < -0.05:
+        return "Negative"
+    else:
+        return "Neutral"
+
+def get_file_type_counts(df):
+    video = df['message'].str.contains("video", case=False, na=False).sum()
+    photo = df['message'].str.contains("photo|image|picture|jpg|jpeg|png", case=False, na=False).sum()
+    audio = df['message'].str.contains("audio|voice|mp3|ogg", case=False, na=False).sum()
+    return video, photo, audio
+
+def preprocess_input(user_input):
+    """Preprocess user input to improve AI understanding."""
+    # Tokenize and clean input
+    tokens = word_tokenize(user_input.lower())
+    cleaned_tokens = [token for token in tokens if token.isalnum()]
+    return ' '.join(cleaned_tokens)
+
+# Sidebar Title
+st.sidebar.title("📁 WhatsApp Chat Analyzer")
+
+
+uploaded_file = st.sidebar.file_uploader("Choose a chat file (.txt)", type=["txt"])
 
 if uploaded_file is not None:
     bytes_data = uploaded_file.getvalue()
     data = bytes_data.decode("utf-8")
     df = Preprocessor.preprocess(data)
+    st.session_state.df = df
+
+    if 'sentiment' not in df.columns:
+        df['sentiment'] = df['message'].apply(get_sentiment)
+    df['sentiment_label'] = df['sentiment'].apply(sentiment_label)
+    df['date_only'] = df['date'].dt.date
 
     user_list = df["user"].unique().tolist()
-    user_list.remove("group_notification")
+    if "group_notification" in user_list:
+        user_list.remove("group_notification")
     user_list.sort()
     user_list.insert(0, "Overall")
 
-    st.sidebar.title("Select User")
+    st.sidebar.title("👤 Select User")
     selected_user = st.sidebar.selectbox("Select a user", user_list)
 
     if st.sidebar.button("Show Analysis"):
-        # Top stats
-        st.title("Top Statistics")
-        num_messages, words, num_media, num_urls = helper.fetch_stats(selected_user, df)
+        st.title("📊 Chat Analysis Dashboard")
 
+        # Stats
+        num_messages, words, num_media, num_urls = helper.fetch_stats(selected_user, df)
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Messages", num_messages)
         col2.metric("Total Words", words)
@@ -41,7 +85,7 @@ if uploaded_file is not None:
         col4.metric("URLs Shared", num_urls)
 
         # Monthly Timeline
-        st.title("Monthly Timeline")
+        st.subheader("📅 Monthly Timeline")
         timeline = helper.monthly_timeline(selected_user, df)
         fig, ax = plt.subplots()
         ax.plot(timeline['time'], timeline['message'], color='green')
@@ -49,7 +93,7 @@ if uploaded_file is not None:
         st.pyplot(fig)
 
         # Daily Timeline
-        st.title("Daily Timeline")
+        st.subheader("🗓️ Daily Timeline")
         timeline = helper.daily_timeline(selected_user, df)
         fig, ax = plt.subplots()
         ax.plot(timeline['only_date'], timeline['message'], color='yellow')
@@ -57,49 +101,42 @@ if uploaded_file is not None:
         st.pyplot(fig)
 
         # Activity Map
-        st.title('Activity Map')
+        st.subheader('🕒 Activity Map')
         col1, col2 = st.columns(2)
-
         with col1:
-            st.header("Most Busy Day")
+            st.markdown("**Most Busy Day**")
             busy_day = helper.week_activity_map(selected_user, df)
             fig, ax = plt.subplots()
             ax.bar(busy_day.index, busy_day.values, color='purple')
             plt.xticks(rotation=90)
             st.pyplot(fig)
-
         with col2:
-            st.header("Most Busy Month")
+            st.markdown("**Most Busy Month**")
             busy_month = helper.month_activity_map(selected_user, df)
             fig, ax = plt.subplots()
             ax.bar(busy_month.index, busy_month.values, color='orange')
             plt.xticks(rotation='vertical')
             st.pyplot(fig)
 
-        # Weekly Heatmap
-        st.title("Weekly Activity Map")
+        st.subheader("📈 Weekly Activity Heatmap")
         user_heatmap = helper.activity_heatmap(selected_user, df)
         fig, ax = plt.subplots()
-        ax = sns.heatmap(user_heatmap)
+        sns.heatmap(user_heatmap, ax=ax)
         st.pyplot(fig)
 
-        # Group Level - Most Busy User
         if selected_user == "Overall":
-            st.title("Most Busy Users")
+            st.subheader("👥 Most Active Users")
             x, new_df = helper.most_busy_user(df)
-
             col1, col2 = st.columns(2)
             with col1:
                 fig, ax = plt.subplots()
                 ax.bar(x.index, x.values, color="red")
                 plt.xticks(rotation=90)
                 st.pyplot(fig)
-
             with col2:
                 st.dataframe(new_df)
 
-        # WordCloud
-        st.title("WordCloud")
+        st.subheader("☁️ WordCloud")
         df_wc = helper.count_wordcloud(selected_user, df)
         fig, ax = plt.subplots()
         ax.imshow(df_wc, interpolation='bilinear')
@@ -128,72 +165,26 @@ if uploaded_file is not None:
         st.pyplot(fig)
 
 
-        # Emoji Analysis
-        st.title("Emoji Analysis")
+        st.subheader("😄 Emoji Analysis")
         emoji_df = helper.emoji_helper(selected_user, df)
-
         col1, col2 = st.columns(2)
-
         with col1:
             st.dataframe(emoji_df)
-
         with col2:
             top_emojis = emoji_df.head(10)
-            fig = px.pie(
-                values=top_emojis[1],
-                names=top_emojis[0],
-                title="Top Emojis",
-                hole=0.3  # for a donut chart, remove this for a regular pie
-            )
+            fig = px.pie(values=top_emojis.iloc[:, 1], names=top_emojis.iloc[:, 0], title="Top Emojis", hole=0.3)
             st.plotly_chart(fig)
 
-        st.title("Ask Chatbot About the Chat 📩")
+        st.subheader("😊 Sentiment Timeline")
+        sentiment_timeline = df.groupby('date_only')['sentiment'].mean()
+        fig, ax = plt.subplots()
+        sentiment_timeline.plot(ax=ax, marker='o')
+        ax.set_ylabel("Average Sentiment")
+        ax.set_title("Sentiment Over Time")
+        st.pyplot(fig)
 
-        # Initialize chat history and question
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
+        st.subheader("😃 Sentiment Distribution")
+        sentiment_counts = df['sentiment_label'].value_counts()
+        fig = px.pie(values=sentiment_counts.values, names=sentiment_counts.index, title="Overall Sentiment Distribution")
+        st.plotly_chart(fig)
 
-        user_input = st.text_input("Type your question here...", key="chat_input")
-
-        if st.button("Ask"):
-            if user_input:
-                # Combine some message context for the chatbot
-                context = "\n".join(df["message"].tolist()[:3000])  # Limit context for API
-                prompt = f"The following is a WhatsApp chat log:\n\n{context}\n\nAnswer this question based only on the chat:\n\n{user_input}"
-
-                import requests
-                import json
-
-                headers = {
-                    "Authorization": "Bearer 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",
-                    "Content-Type": "application/json",
-                }
-
-                payload = {
-                    "model": "google/gemma-1.1-7b-it:free",  # Choose your preferred model
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ]
-                }
-
-                with st.spinner("🤖 Thinking..."):
-                    response = requests.post(
-                        url="https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        data=json.dumps(payload)
-                    )
-
-                    try:
-                        data = response.json()
-                        reply = data["choices"][0]["message"]["content"]
-                        st.session_state.chat_history.append((user_input, reply))
-                    except Exception as e:
-                        reply = "⚠️ Failed to get a valid response."
-                        st.session_state.chat_history.append((user_input, reply))
-
-        # Show chat history
-        if st.session_state.chat_history:
-            for i, (q, a) in enumerate(reversed(st.session_state.chat_history)):
-                st.markdown(f"**You:** {q}")
-                st.markdown(f"**Bot:** {a}")
-                st.markdown("---")
