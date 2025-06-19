@@ -1,3 +1,4 @@
+nltk
 streamlit
 pandas
 numpy
@@ -7,7 +8,6 @@ wordcloud
 emoji
 regex
 urlextract
-nltk
 fonttools
 plotly
 requests
