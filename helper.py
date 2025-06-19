@@ -53,7 +53,7 @@ def count_wordcloud(selected_user, df):
     df["cleaned"] = df["message"].apply(clean_text)
     text = " ".join(df["cleaned"])
 
-    wc = WordCloud(width=500, height=500, background_color='white', font_path='NotoSansBengali-VariableFont_wdth,wght.ttf', min_font_size=10)
+    wc = WordCloud(width=500, height=500, background_color='white', font_path='nirmala-ui.ttf', min_font_size=10)
     return wc.generate(text)
 
 # Most common words
