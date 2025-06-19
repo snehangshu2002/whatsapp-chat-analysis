@@ -6,21 +6,23 @@ import seaborn as sns
 from matplotlib import rcParams
 import plotly.express as px
 import json
-import helper
-import Preprocessor
 import re
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from urlextract import URLExtract
 from collections import Counter
 import nltk
 
-# Download required NLTK corpora only once in Streamlit Cloud
+# ✅ Ensure NLTK resources are downloaded
 @st.cache_resource
 def setup_nltk():
-    nltk.download('stopwords')
-    nltk.download('punkt')
+    nltk.download('punkt', quiet=True)
 
 setup_nltk()
+
+from nltk.tokenize import word_tokenize
+import helper
+import Preprocessor
+
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
