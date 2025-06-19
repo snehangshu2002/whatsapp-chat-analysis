@@ -2,11 +2,22 @@ import re
 import pandas as pd
 
 def preprocess(data):
-    pattern = r'\d{1,2}/\d{1,2}/\d{1,2}, \d{1,2}:\d{1,2}\u202f(?:am|pm) - '
+    # Pattern to match both 24-hour and 12-hour (with or without am/pm) time formats
+    pattern = r'\d{1,2}/\d{1,2}/\d{2}, \d{1,2}:\d{2}(?:\u202f?(?:am|pm))? - '
     messages = re.split(pattern, data)[1:]
-    dates=re.findall(pattern, data)
-    df=pd.DataFrame({'date': dates, 'message': messages})
-    df["date"] = pd.to_datetime(df["date"], format='%d/%m/%y, %I:%M\u202f%p - ')
+    dates = re.findall(pattern, data)
+    df = pd.DataFrame({'date': dates, 'message': messages})
+
+    # Try parsing with both 24-hour and 12-hour formats
+    def parse_date(date_str):
+        for fmt in ['%d/%m/%y, %I:%M\u202f%p - ', '%d/%m/%y, %H:%M - ', '%m/%d/%y, %H:%M - ', '%m/%d/%y, %I:%M\u202f%p - ']:
+            try:
+                return pd.to_datetime(date_str, format=fmt)
+            except Exception:
+                continue
+        return pd.NaT
+
+    df["date"] = df["date"].apply(parse_date)
 
     # Separate users and messages from the 'message' column
     users = []
