@@ -13,11 +13,18 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from urlextract import URLExtract
 from collections import Counter
 import nltk
-nltk.download('stopwords')
+
+# Download required NLTK corpora only once in Streamlit Cloud
+@st.cache_resource
+def setup_nltk():
+    nltk.download('stopwords')
+    nltk.download('punkt')
+
+setup_nltk()
+
+from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-# Download required NLTK data
-nltk.download('punkt', quiet=True)
 
 rcParams['font.family'] = 'Segoe UI Emoji'
 analyzer = SentimentIntensityAnalyzer()
