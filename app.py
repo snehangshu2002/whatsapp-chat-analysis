@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 import seaborn as sns
 from matplotlib import rcParams
+import plotly.express as px
+
+
 
 # Set emoji-compatible font
 rcParams['font.family'] = 'Segoe UI Emoji'
@@ -111,12 +114,19 @@ if uploaded_file is not None:
         most_common_df = helper.most_common_user(selected_user, df)
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.barh(most_common_df["Common words"], most_common_df["count"], color='skyblue')
+
+        # Set Bengali font for all text elements
+        ax.set_title("Most Common Words in Chat", fontproperties=bengali_font)
         ax.set_xlabel("Count", fontproperties=bengali_font)
         ax.set_ylabel("Words", fontproperties=bengali_font)
-        ax.set_title("Most Common Words in Chat", fontproperties=bengali_font)
+
+        # Manually set yticks with Bengali font
+        ax.set_yticks(range(len(most_common_df)))
         ax.set_yticklabels(most_common_df["Common words"], fontproperties=bengali_font)
+
         plt.tight_layout()
         st.pyplot(fig)
+
 
         # Emoji Analysis
         st.title("Emoji Analysis")
@@ -128,14 +138,62 @@ if uploaded_file is not None:
             st.dataframe(emoji_df)
 
         with col2:
-            fig, ax = plt.subplots()
             top_emojis = emoji_df.head(10)
-            ax.pie(top_emojis[1],
-                   labels=top_emojis[0],
-                   autopct='%0.2f%%',
-                   startangle=90,
-                   textprops={'fontsize': 14})
-            ax.axis('equal')
-            st.pyplot(fig)
+            fig = px.pie(
+                values=top_emojis[1],
+                names=top_emojis[0],
+                title="Top Emojis",
+                hole=0.3  # for a donut chart, remove this for a regular pie
+            )
+            st.plotly_chart(fig)
 
-        
+        st.title("Ask Chatbot About the Chat 📩")
+
+        # Initialize chat history and question
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+
+        user_input = st.text_input("Type your question here...", key="chat_input")
+
+        if st.button("Ask"):
+            if user_input:
+                # Combine some message context for the chatbot
+                context = "\n".join(df["message"].tolist()[:3000])  # Limit context for API
+                prompt = f"The following is a WhatsApp chat log:\n\n{context}\n\nAnswer this question based only on the chat:\n\n{user_input}"
+
+                import requests
+                import json
+
+                headers = {
+                    "Authorization": "Bearer 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",
+                    "Content-Type": "application/json",
+                }
+
+                payload = {
+                    "model": "google/gemma-1.1-7b-it:free",  # Choose your preferred model
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+
+                with st.spinner("🤖 Thinking..."):
+                    response = requests.post(
+                        url="https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        data=json.dumps(payload)
+                    )
+
+                    try:
+                        data = response.json()
+                        reply = data["choices"][0]["message"]["content"]
+                        st.session_state.chat_history.append((user_input, reply))
+                    except Exception as e:
+                        reply = "⚠️ Failed to get a valid response."
+                        st.session_state.chat_history.append((user_input, reply))
+
+        # Show chat history
+        if st.session_state.chat_history:
+            for i, (q, a) in enumerate(reversed(st.session_state.chat_history)):
+                st.markdown(f"**You:** {q}")
+                st.markdown(f"**Bot:** {a}")
+                st.markdown("---")
