@@ -13,6 +13,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from urlextract import URLExtract
 from collections import Counter
 import nltk
+nltk.download('stopwords')
 from nltk.tokenize import word_tokenize
 
 # Download required NLTK data
