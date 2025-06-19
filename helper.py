@@ -2,19 +2,28 @@ from urlextract import URLExtract
 import pandas as pd
 import emoji
 from wordcloud import WordCloud
-from nltk.corpus import stopwords
 from collections import Counter
 import re
 import requests
 import logging
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+# Fix: Ensure stopwords are downloaded
+import nltk
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+from nltk.corpus import stopwords
 
 # Initialize VADER for fallback sentiment
 analyzer = SentimentIntensityAnalyzer()
 
 # Load stopwords
 english_stopwords = set(stopwords.words('english'))
+
+# Load Hinglish stopwords from file
 with open("stop_hinglish.txt", "r", encoding="utf-8") as english:
     stopwords_eng = english.read()
 
