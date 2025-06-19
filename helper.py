@@ -3,9 +3,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import emoji
 from wordcloud import WordCloud
-from nltk.corpus import stopwords
+
 from collections import Counter
 from matplotlib import font_manager as fm
+import nltk
+from nltk.corpus import stopwords
+
+try:
+    stopwords.words('english')
+except LookupError:
+    nltk.download('stopwords')
 
 import os
 
