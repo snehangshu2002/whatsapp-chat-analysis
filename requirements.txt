@@ -11,4 +11,4 @@ nltk
 fonttools
 plotly
 requests
-
+vaderSentiment
